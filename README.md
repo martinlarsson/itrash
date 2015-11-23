@@ -1,2 +1,2 @@
-# itrash
-Software for smart trashcan using Phidgets
+# iTrash
+Software for smart trashcan using Phidgets.
