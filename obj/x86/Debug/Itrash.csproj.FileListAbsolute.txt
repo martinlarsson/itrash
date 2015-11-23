@@ -1,0 +1,5 @@
+c:\users\marlar\documents\visual studio 2010\Projects\Itrash\Itrash\bin\Debug\Itrash.exe
+c:\users\marlar\documents\visual studio 2010\Projects\Itrash\Itrash\bin\Debug\Itrash.pdb
+c:\users\marlar\documents\visual studio 2010\Projects\Itrash\Itrash\obj\x86\Debug\Itrash.csprojResolveAssemblyReference.cache
+c:\users\marlar\documents\visual studio 2010\Projects\Itrash\Itrash\obj\x86\Debug\Itrash.exe
+c:\users\marlar\documents\visual studio 2010\Projects\Itrash\Itrash\obj\x86\Debug\Itrash.pdb
