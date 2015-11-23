@@ -11,6 +11,7 @@ namespace Itrash
     {
         static void Main(string[] args)
         {
+            Console.WriteLine("En apa och en katt, vilken underbar skatt!");
         }
     }
 }
