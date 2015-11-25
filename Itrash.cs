@@ -10,9 +10,9 @@ namespace Itrash
 {  
     class Itrash 
     {
-        private static int SENSOR_IR = 5;
-        private static int SENSOR_WEIGHT = 7;
-        private static int SENSOR_LEVEL = 6;
+        private static int SENSOR_IR_ID = 5;
+        private static int SENSOR_WEIGHT_ID = 7;
+        private static int SENSOR_LEVEL_ID = 4;
         private static int LED_RED = 1;
         private static int LED_GREEN = 3;
         private static int SLEEP_TIME_MS = 4000;
@@ -20,11 +20,12 @@ namespace Itrash
         private static double SERVO_START_POS = 115.00;
         private static double SERVO_END_POS = 200.00;
         private static double DISTANCE_THRESHOLD = 280.00;
-        private static double LEVEL_THRESHOLD = 200.00;
+        private static double LEVEL_THRESHOLD = 5.00;
 
         private InterfaceKit ifKit;
         private Servo servo;
         private Boolean open = false;
+        private int currWeight = 0;
 
         /// <summary>
         /// Initialize servo and interface kit.
@@ -56,7 +57,7 @@ namespace Itrash
                 ifKit.outputs[i] = false;
             }
 
-            //closeCanOnExit();
+            closeCanOnExit();
             servo.close();
             ifKit.close();
 
@@ -87,8 +88,11 @@ namespace Itrash
 
             // Turn on the green status-light on the front side of the iTrash
             Thread.Sleep(500);
+
+
             ifKit.outputs[LED_GREEN] = true;
         }
+
 
         /// <summary>
         /// Initialize servo
@@ -144,12 +148,14 @@ namespace Itrash
             {
                 servo.servos[0].Position = SERVO_END_POS;
             }
-            Console.WriteLine("Servo's position set to 210.00");
+            Console.WriteLine("Servo's position set to "+SERVO_END_POS);
             Thread.Sleep(SLEEP_TIME_MS);
             if (servo.Attached)
             {
                 servo.servos[0].Position = SERVO_START_POS;
             }
+            Thread.Sleep(SLEEP_TIME_MS / 2);
+            Console.WriteLine("Servo's position set to " + SERVO_START_POS);
             open = false;
         }
 
@@ -163,7 +169,10 @@ namespace Itrash
             {
                 servo.servos[0].Position = SERVO_START_POS;
             }
+            Console.WriteLine("Servo's position set to " + SERVO_START_POS);
             open = false;
+            ifKit.outputs[LED_GREEN] = false;
+            ifKit.outputs[LED_RED] = false;
         }
 
         /// <summary>
@@ -173,7 +182,11 @@ namespace Itrash
         /// <param name="e">SensorChangeEventArgs</param>
         private void ifKit_SensorChange(object sender, SensorChangeEventArgs e)
         {
-            if (e.Index == SENSOR_IR && e.Value > DISTANCE_THRESHOLD)
+            if (e.Index == SENSOR_WEIGHT_ID)
+            {
+                this.currWeight = e.Value;
+            }
+            if (e.Index == SENSOR_IR_ID && e.Value > DISTANCE_THRESHOLD)
             {
                 if (!open)
                 {
@@ -181,12 +194,14 @@ namespace Itrash
                     Thread lidThread = new Thread(new ThreadStart(this.openCan));
                     lidThread.Start();
                 }
-            } else if (e.Index == SENSOR_WEIGHT)
-            {
-                Console.WriteLine("Sensor index {0} value {1}", e.Index, e.Value.ToString());
-            } else if (e.Index == SENSOR_LEVEL && e.Value > LEVEL_THRESHOLD)
+            } 
+            else if (e.Index == SENSOR_LEVEL_ID && e.Value > LEVEL_THRESHOLD && !open && currWeight > 150)
             {
                 fullCan();
+            }
+            else if (currWeight < 150 && !open)
+            {
+                notFullCan();
             }
         }
 
@@ -202,7 +217,7 @@ namespace Itrash
         /// <summary>
         /// Lights up the green led and turns off the red led.
         /// </summary>
-        private void emptyCan()
+        private void notFullCan()
         {
             ifKit.outputs[LED_GREEN] = true;
             ifKit.outputs[LED_RED] = false;
