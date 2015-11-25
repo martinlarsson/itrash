@@ -8,22 +8,43 @@ using System.Threading;
 
 namespace Itrash
 {
+
     class Itrash 
     {
         private InterfaceKit ifKit;
         private Servo servo;
+        public Boolean open = false;
 
         public Itrash()
         {
             try
             {
+                initServo();
                 initInterFaceKit();
-                //initServo();
+                keepAlive();
             }
             catch (PhidgetException pex)
             {
                 Console.WriteLine(pex.Description);
             }
+        }
+
+        private void keepAlive()
+        {
+            // Wait for an InterfaceKit phidget to be attached
+            Console.WriteLine("Press any key to end...");
+            Console.Read();
+
+            for (int i = 0; i < ifKit.outputs.Count; i++)
+            {
+                ifKit.outputs[i] = false;
+            }
+
+            // User input was read so we'll terminate the program, so close the object
+            ifKit.close();
+
+            // Set the object to null to get it out of memory
+            ifKit = null;
         }
 
         private void initInterFaceKit()
@@ -44,15 +65,9 @@ namespace Itrash
             // Open the object for device connections
             ifKit.open();
 
-            // Wait for an InterfaceKit phidget to be attached
-            Console.WriteLine("Press any key to end...");
-            Console.Read();
-
-            // User input was read so we'll terminate the program, so close the object
-            ifKit.close();
-
-            // Set the object to null to get it out of memory
-            ifKit = null;
+            // Turn on the green status-light on the front side of the iTrash
+            Thread.Sleep(500);
+            ifKit.outputs[3] = true;
         }
 
         private void initServo()
@@ -65,28 +80,8 @@ namespace Itrash
             servo.open();
             Console.WriteLine("Awaiting Servo attachment..");
             servo.waitForAttachment();
-            if (servo.Attached)
-            {
-                servo.servos[0].Position = 15.00;
-            }
-            Console.WriteLine("Servo's position set to 15.00");
-            Console.WriteLine("Press any key to continue...");
-            Console.Read();
-            if (servo.Attached)
-            {
-                servo.servos[0].Position = 115;
-            }
-
-
-
-            servo.close();
-            servo = null;
         }
-        /// <summary>
-        /// Du kan va en summary!
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+
         private void servo_PositionChange(object sender, PositionChangeEventArgs e)
         {
             Console.WriteLine("Servo {0} Position {1}", e.Index, e.Position);
@@ -117,9 +112,58 @@ namespace Itrash
             //ifKit = null;
         //}
 
+        public void openCan()
+        {
+            if (servo.Attached)
+            {
+                servo.servos[0].Position = 200.00;
+            }
+            Console.WriteLine("Servo's position set to 210.00");
+            Thread.Sleep(4000);
+            if (servo.Attached)
+            {
+                servo.servos[0].Position = 115.00;
+            }
+            open = false;
+
+        }
+
         private void ifKit_SensorChange(object sender, SensorChangeEventArgs e)
         {
-            Console.WriteLine("Sensor index {0} value {1}", e.Index, e.Value.ToString());
+
+            if (e.Index == 5 && e.Value > 280.00)
+            {
+                if (!open)
+                {
+                    open = true;
+                    Thread openThread = new Thread(new ThreadStart(this.openCan));
+                    openThread.Start();
+               
+                }
+            
+                
+            }
+            if (e.Index==4)
+            {
+                Console.WriteLine("Sensor index {0} value {1}", e.Index, e.Value.ToString());
+            }
+
+
+
+
+
+            if (e.Index == 6 && e.Value > 200)
+            {
+                
+                fullCan();
+            }
+            //Console.WriteLine("Sensor index {0} value {1}", e.Index, e.Value.ToString());
+        }
+
+        private void fullCan()
+        {
+            ifKit.outputs[3] = false;
+            ifKit.outputs[1] = true;
         }
 
         private void ifKit_OutputChange(object sender, OutputChangeEventArgs e)
