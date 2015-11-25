@@ -7,14 +7,28 @@ using Phidgets.Events;
 using System.Threading;
 
 namespace Itrash
-{
-
+{  
     class Itrash 
     {
+        private static int SENSOR_IR = 5;
+        private static int SENSOR_WEIGHT = 7;
+        private static int SENSOR_LEVEL = 6;
+        private static int LED_RED = 1;
+        private static int LED_GREEN = 3;
+        private static int SLEEP_TIME_MS = 4000;
+
+        private static double SERVO_START_POS = 115.00;
+        private static double SERVO_END_POS = 200.00;
+        private static double DISTANCE_THRESHOLD = 280.00;
+        private static double LEVEL_THRESHOLD = 200.00;
+
         private InterfaceKit ifKit;
         private Servo servo;
-        public Boolean open = false;
+        private Boolean open = false;
 
+        /// <summary>
+        /// Initialize servo and interface kit.
+        /// </summary>
         public Itrash()
         {
             try
@@ -29,9 +43,11 @@ namespace Itrash
             }
         }
 
+        /// <summary>
+        /// Waits for input from keyboard to exit.
+        /// </summary>
         private void keepAlive()
         {
-            // Wait for an InterfaceKit phidget to be attached
             Console.WriteLine("Press any key to end...");
             Console.Read();
 
@@ -40,13 +56,17 @@ namespace Itrash
                 ifKit.outputs[i] = false;
             }
 
-            // User input was read so we'll terminate the program, so close the object
+            //closeCanOnExit();
+            servo.close();
             ifKit.close();
 
-            // Set the object to null to get it out of memory
             ifKit = null;
+            servo = null;
         }
 
+        /// <summary>
+        /// Initialize interface kit
+        /// </summary>
         private void initInterFaceKit()
         {
             // Initialize the InterfaceKit object
@@ -67,9 +87,12 @@ namespace Itrash
 
             // Turn on the green status-light on the front side of the iTrash
             Thread.Sleep(500);
-            ifKit.outputs[3] = true;
+            ifKit.outputs[LED_GREEN] = true;
         }
 
+        /// <summary>
+        /// Initialize servo
+        /// </summary>
         private void initServo()
         {
             servo = new Servo();
@@ -112,58 +135,77 @@ namespace Itrash
             //ifKit = null;
         //}
 
-        public void openCan()
+        /// <summary>
+        /// Open can for 4 seconds and then automatically close.
+        /// </summary>
+        private void openCan()
         {
             if (servo.Attached)
             {
-                servo.servos[0].Position = 200.00;
+                servo.servos[0].Position = SERVO_END_POS;
             }
             Console.WriteLine("Servo's position set to 210.00");
-            Thread.Sleep(4000);
+            Thread.Sleep(SLEEP_TIME_MS);
             if (servo.Attached)
             {
-                servo.servos[0].Position = 115.00;
+                servo.servos[0].Position = SERVO_START_POS;
             }
             open = false;
-
         }
 
+        /// <summary>
+        /// Called when program exits to make sure can closes.
+        /// </summary>
+        private void closeCanOnExit()
+        {
+            Thread.Sleep(SLEEP_TIME_MS);
+            if (servo.Attached)
+            {
+                servo.servos[0].Position = SERVO_START_POS;
+            }
+            open = false;
+        }
+
+        /// <summary>
+        /// Called when any sensor reads a new value
+        /// </summary>
+        /// <param name="sender">object</param>
+        /// <param name="e">SensorChangeEventArgs</param>
         private void ifKit_SensorChange(object sender, SensorChangeEventArgs e)
         {
-
-            if (e.Index == 5 && e.Value > 280.00)
+            if (e.Index == SENSOR_IR && e.Value > DISTANCE_THRESHOLD)
             {
                 if (!open)
                 {
                     open = true;
-                    Thread openThread = new Thread(new ThreadStart(this.openCan));
-                    openThread.Start();
-               
+                    Thread lidThread = new Thread(new ThreadStart(this.openCan));
+                    lidThread.Start();
                 }
-            
-                
-            }
-            if (e.Index==4)
+            } else if (e.Index == SENSOR_WEIGHT)
             {
                 Console.WriteLine("Sensor index {0} value {1}", e.Index, e.Value.ToString());
-            }
-
-
-
-
-
-            if (e.Index == 6 && e.Value > 200)
+            } else if (e.Index == SENSOR_LEVEL && e.Value > LEVEL_THRESHOLD)
             {
-                
                 fullCan();
             }
-            //Console.WriteLine("Sensor index {0} value {1}", e.Index, e.Value.ToString());
         }
 
+        /// <summary>
+        /// Lights up the red led and turns off the green led.
+        /// </summary>
         private void fullCan()
         {
-            ifKit.outputs[3] = false;
-            ifKit.outputs[1] = true;
+            ifKit.outputs[LED_GREEN] = false;
+            ifKit.outputs[LED_RED] = true;
+        }
+
+        /// <summary>
+        /// Lights up the green led and turns off the red led.
+        /// </summary>
+        private void emptyCan()
+        {
+            ifKit.outputs[LED_GREEN] = true;
+            ifKit.outputs[LED_RED] = false;
         }
 
         private void ifKit_OutputChange(object sender, OutputChangeEventArgs e)
