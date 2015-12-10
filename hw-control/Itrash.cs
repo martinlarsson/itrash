@@ -10,15 +10,28 @@ namespace Itrash
 {  
     class Itrash 
     {
+        //Sensors
         private static int SENSOR_IR_ID = 5;
         private static int SENSOR_WEIGHT_ID = 7;
         private static int SENSOR_LEVEL_ID = 4;
-        private static int LED_RED = 1;
-        private static int LED_GREEN = 3;
-        private static int SLEEP_TIME_MS = 4000;
+        private static int SENSOR_ROTATION_ID = 3;
 
+        //LEDs
+        private static int LED_RED = 0;
+        private static int LED_GREEN = 3;
+        private static int LED_PAPER = 2;
+        private static int LED_PET = 6;
+        private static int LED_BURN = 7;
+
+        //Sleep
+        private static int SLEEP_TIME_MS = 4000;
+        private static int SHUTDOWN_TIME_MS = 500;
+
+        //Servo
         private static double SERVO_START_POS = 115.00;
         private static double SERVO_END_POS = 200.00;
+
+        //Thresholds
         private static double DISTANCE_THRESHOLD = 280.00;
         private static double LEVEL_THRESHOLD = 5.00;
 
@@ -36,6 +49,7 @@ namespace Itrash
             {
                 initServo();
                 initInterFaceKit();
+                feedMe();
                 keepAlive();
             }
             catch (PhidgetException pex)
@@ -49,7 +63,7 @@ namespace Itrash
         /// </summary>
         private void keepAlive()
         {
-            Console.WriteLine("Press any key to end...");
+            Console.WriteLine("Press enter to shutdown...");
             Console.Read();
 
             for (int i = 0; i < ifKit.outputs.Count; i++)
@@ -88,8 +102,6 @@ namespace Itrash
 
             // Turn on the green status-light on the front side of the iTrash
             Thread.Sleep(500);
-
-
             ifKit.outputs[LED_GREEN] = true;
         }
 
@@ -109,38 +121,8 @@ namespace Itrash
             servo.waitForAttachment();
         }
 
-        private void servo_PositionChange(object sender, PositionChangeEventArgs e)
-        {
-            Console.WriteLine("Servo {0} Position {1}", e.Index, e.Position);
-        }
-
-        private void servo_Error(object sender, ErrorEventArgs e)
-        {
-            Console.WriteLine(e.Description);
-        }
-
-        private void servo_Detach(object sender, DetachEventArgs e)
-        {
-            Console.WriteLine("Detached"+e.Device);
-        }
-
-        private void servo_Attach(object sender, AttachEventArgs e)
-        {
-            Console.WriteLine("Attached "+e.Device);
-        }
-
-        //public void run()
-        //{
-           // ifKit.open();
-            //Console.WriteLine("Awaiting Interface Kit attachment...");
-            //ifKit.waitForAttachment();
-            //Console.WriteLine("Nr of sensors: " + ifKit.sensors.Count);
-            //ifKit.close();
-            //ifKit = null;
-        //}
-
         /// <summary>
-        /// Open can for 4 seconds and then automatically close.
+        /// Open can for SLEEP_TIME_MS ms and then automatically close.
         /// </summary>
         private void openCan()
         {
@@ -148,14 +130,12 @@ namespace Itrash
             {
                 servo.servos[0].Position = SERVO_END_POS;
             }
-            Console.WriteLine("Servo's position set to "+SERVO_END_POS);
             Thread.Sleep(SLEEP_TIME_MS);
             if (servo.Attached)
             {
                 servo.servos[0].Position = SERVO_START_POS;
             }
             Thread.Sleep(SLEEP_TIME_MS / 2);
-            Console.WriteLine("Servo's position set to " + SERVO_START_POS);
             open = false;
         }
 
@@ -164,45 +144,44 @@ namespace Itrash
         /// </summary>
         private void closeCanOnExit()
         {
-            Thread.Sleep(SLEEP_TIME_MS);
+            Thread.Sleep(SHUTDOWN_TIME_MS);
             if (servo.Attached)
             {
                 servo.servos[0].Position = SERVO_START_POS;
             }
-            Console.WriteLine("Servo's position set to " + SERVO_START_POS);
             open = false;
             ifKit.outputs[LED_GREEN] = false;
             ifKit.outputs[LED_RED] = false;
+            ifKit.outputs[LED_PAPER] = false;
+            ifKit.outputs[LED_PET] = false;
+            ifKit.outputs[LED_BURN] = true;
         }
 
         /// <summary>
-        /// Called when any sensor reads a new value
+        /// The can calls for trash! Lights flashing, lid opening/closing repeatedly.
         /// </summary>
-        /// <param name="sender">object</param>
-        /// <param name="e">SensorChangeEventArgs</param>
-        private void ifKit_SensorChange(object sender, SensorChangeEventArgs e)
+        private void feedMe()
         {
-            if (e.Index == SENSOR_WEIGHT_ID)
+            ifKit.outputs[LED_GREEN] = true;
+            ifKit.outputs[LED_RED] = false;
+            for (int i = 0; i < 10; i++)
             {
-                this.currWeight = e.Value;
+                ifKit.outputs[LED_GREEN] = !ifKit.outputs[LED_GREEN];
+                ifKit.outputs[LED_RED] = !ifKit.outputs[LED_RED];
+                ifKit.outputs[LED_PAPER] = (i % 3 == 0) ? true : false;
+                ifKit.outputs[LED_PET] = (i % 3 == 1) ? true : false;
+                ifKit.outputs[LED_BURN] = (i % 3 == 2) ? false : true;
+                servo.servos[0].Position = (i % 2 == 0) ? SERVO_START_POS : SERVO_END_POS;
+                Thread.Sleep(300);
             }
-            if (e.Index == SENSOR_IR_ID && e.Value > DISTANCE_THRESHOLD)
-            {
-                if (!open)
-                {
-                    open = true;
-                    Thread lidThread = new Thread(new ThreadStart(this.openCan));
-                    lidThread.Start();
-                }
-            } 
-            else if (e.Index == SENSOR_LEVEL_ID && e.Value > LEVEL_THRESHOLD && !open && currWeight > 150)
-            {
-                fullCan();
-            }
-            else if (currWeight < 150 && !open)
-            {
-                notFullCan();
-            }
+
+            // Clean up
+            ifKit.outputs[LED_GREEN] = true;
+            ifKit.outputs[LED_RED] = false;
+            ifKit.outputs[LED_PAPER] = true;
+            ifKit.outputs[LED_PET] = false;
+            ifKit.outputs[LED_BURN] = true;
+            servo.servos[0].Position = SERVO_START_POS;
         }
 
         /// <summary>
@@ -215,38 +194,162 @@ namespace Itrash
         }
 
         /// <summary>
-        /// Lights up the green led and turns off the red led.
+        /// Lights up the green led and turns off the red led
         /// </summary>
         private void notFullCan()
         {
             ifKit.outputs[LED_GREEN] = true;
             ifKit.outputs[LED_RED] = false;
         }
+        /// <summary>
+        /// Light up the correct LED indicating trash type based on rotation value
+        /// </summary>
+        /// <param name="e">Event arguments</param>
+        private void changeTrashType(SensorChangeEventArgs e)
+        {
+            if (e.Value > 750)
+            {
+                ifKit.outputs[LED_PAPER] = true;
+                ifKit.outputs[LED_PET] = false;
+                ifKit.outputs[LED_BURN] = true;
+            }
+            else if (e.Value < 500)
+            {
+                ifKit.outputs[LED_PAPER] = false;
+                ifKit.outputs[LED_PET] = false;
+                ifKit.outputs[LED_BURN] = false;
+            }
+            else
+            {
+                ifKit.outputs[LED_PAPER] = false;
+                ifKit.outputs[LED_PET] = true;
+                ifKit.outputs[LED_BURN] = true;
+            }
+        }
 
+        /// <summary>
+        /// Event handler for change in sensor reading from interface kit
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
+        private void ifKit_SensorChange(object sender, SensorChangeEventArgs e)
+        {
+            if (e.Index == SENSOR_WEIGHT_ID)
+            {
+                this.currWeight = e.Value;
+            }
+            else if (e.Index == SENSOR_IR_ID && e.Value > DISTANCE_THRESHOLD)
+            {
+                if (!open)
+                {
+                    open = true;
+                    Thread lidThread = new Thread(new ThreadStart(this.openCan));
+                    lidThread.Start();
+                }
+            } 
+            else if (e.Index == SENSOR_LEVEL_ID && e.Value > LEVEL_THRESHOLD && !open && currWeight > 150)
+            {
+                fullCan();
+            }
+            else if (e.Index == SENSOR_ROTATION_ID)
+            {
+                changeTrashType(e);
+            }
+
+            else if (currWeight < 150 && !open)
+            {
+                notFullCan();
+            }
+        }
+
+        /// <summary>
+        /// Event handler for change in interface output
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
         private void ifKit_OutputChange(object sender, OutputChangeEventArgs e)
         {
-            Console.WriteLine("Output index {0} value {1}", e.Index, e.Value.ToString());
+            //Console.WriteLine("Output index {0} value {1}", e.Index, e.Value.ToString());
         }
 
+        /// <summary>
+        /// Event handler for change in interface input
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
         private void ifKit_InputChange(object sender, InputChangeEventArgs e)
         {
-            Console.WriteLine("Input index {0} value {1}", e.Index, e.Value.ToString());
+            //Console.WriteLine("Input index {0} value {1}", e.Index, e.Value.ToString());
         }
 
+        /// <summary>
+        /// Error handler for interface kit
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
         private void ifKit_Error(object sender, ErrorEventArgs e)
         {
             Console.WriteLine(e.Description);
         }
 
+        /// <summary>
+        /// Detach event handler for interface kit
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
         private void ifKit_Detach(object sender, DetachEventArgs e)
         {
             Console.WriteLine("InterfaceKit {0} detached!", e.Device.SerialNumber.ToString());
         }
 
+        /// <summary>
+        /// Attach event handler for interface kit
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
         private void ifKit_Attach(object sender, AttachEventArgs e)
         {
             Console.WriteLine("InterfaceKit {0} attached!", e.Device.SerialNumber.ToString());
         }
-        
+
+        /// <summary>
+        /// Position change handler for servo
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
+        private void servo_PositionChange(object sender, PositionChangeEventArgs e)
+        {
+            //Console.WriteLine("Servo {0} Position {1}", e.Index, e.Position);
+        }
+
+        /// <summary>
+        /// Error event handler for servo
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
+        private void servo_Error(object sender, ErrorEventArgs e)
+        {
+            Console.WriteLine(e.Description);
+        }
+
+        /// <summary>
+        /// Detach event handler for servo
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
+        private void servo_Detach(object sender, DetachEventArgs e)
+        {
+            Console.WriteLine("Detached" + e.Device);
+        }
+
+        /// <summary>
+        /// Attach event handler for servo
+        /// </summary>
+        /// <param name="sender">Sender</param>
+        /// <param name="e">Event arguments</param>
+        private void servo_Attach(object sender, AttachEventArgs e)
+        {
+            Console.WriteLine("Attached " + e.Device);
+        }
     }
 }
