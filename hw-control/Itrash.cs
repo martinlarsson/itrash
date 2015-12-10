@@ -49,7 +49,6 @@ namespace Itrash
             {
                 initServo();
                 initInterFaceKit();
-                feedMe();
                 keepAlive();
             }
             catch (PhidgetException pex)
@@ -63,8 +62,17 @@ namespace Itrash
         /// </summary>
         private void keepAlive()
         {
-            Console.WriteLine("Press enter to shutdown...");
-            Console.Read();
+            Console.WriteLine("feed: can goes bananas.");
+            Console.WriteLine("exit: exit program.");
+            String input = Console.ReadLine();
+            while (!input.Equals("exit"))
+            {
+                if (input.Equals("feed"))
+                {
+                    feedMe();
+                }
+                input = Console.ReadLine();
+            }
 
             for (int i = 0; i < ifKit.outputs.Count; i++)
             {
