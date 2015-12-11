@@ -38,6 +38,7 @@ namespace Itrash
         private InterfaceKit ifKit;
         private Servo servo;
         private Boolean open = false;
+        private Boolean fullLock = false;
         private int currWeight = 0;
 
         /// <summary>
@@ -63,6 +64,7 @@ namespace Itrash
         private void keepAlive()
         {
             Console.WriteLine("feed: can goes bananas.");
+            Console.WriteLine("full: toggle 'full' status.");
             Console.WriteLine("exit: exit program.");
             String input = Console.ReadLine();
             while (!input.Equals("exit"))
@@ -71,20 +73,33 @@ namespace Itrash
                 {
                     feedMe();
                 }
+                else if (input.Equals("full"))
+                {
+                    toggleFull();
+                }
                 input = Console.ReadLine();
             }
 
-            for (int i = 0; i < ifKit.outputs.Count; i++)
+            /*for (int i = 0; i < ifKit.outputs.Count; i++)
             {
                 ifKit.outputs[i] = false;
-            }
+            }*/
 
+            Thread.Sleep(SLEEP_TIME_MS);
             closeCanOnExit();
+            Thread.Sleep(SLEEP_TIME_MS);
             servo.close();
             ifKit.close();
 
             ifKit = null;
             servo = null;
+        }
+
+        private void toggleFull()
+        {
+            fullLock = !fullLock;
+            ifKit.outputs[LED_GREEN] = !ifKit.outputs[LED_GREEN];
+            ifKit.outputs[LED_RED] = !ifKit.outputs[LED_RED];
         }
 
         /// <summary>
@@ -111,6 +126,9 @@ namespace Itrash
             // Turn on the green status-light on the front side of the iTrash
             Thread.Sleep(500);
             ifKit.outputs[LED_GREEN] = true;
+
+            // Update the trash type light (turn on the correct one)
+            updateTrashLEDs(ifKit.sensors[SENSOR_ROTATION_ID].Value);
         }
 
 
@@ -152,17 +170,16 @@ namespace Itrash
         /// </summary>
         private void closeCanOnExit()
         {
-            Thread.Sleep(SHUTDOWN_TIME_MS);
-            if (servo.Attached)
-            {
-                servo.servos[0].Position = SERVO_START_POS;
-            }
             open = false;
             ifKit.outputs[LED_GREEN] = false;
             ifKit.outputs[LED_RED] = false;
             ifKit.outputs[LED_PAPER] = false;
             ifKit.outputs[LED_PET] = false;
             ifKit.outputs[LED_BURN] = true;
+            if (servo.Attached)
+            {
+                servo.servos[0].Position = SERVO_START_POS;
+            }
         }
 
         /// <summary>
@@ -184,11 +201,12 @@ namespace Itrash
             }
 
             // Clean up
-            ifKit.outputs[LED_GREEN] = true;
+            /*ifKit.outputs[LED_GREEN] = true;
             ifKit.outputs[LED_RED] = false;
             ifKit.outputs[LED_PAPER] = true;
             ifKit.outputs[LED_PET] = false;
-            ifKit.outputs[LED_BURN] = true;
+            ifKit.outputs[LED_BURN] = true;*/
+            updateTrashLEDs(ifKit.sensors[SENSOR_ROTATION_ID].Value);
             servo.servos[0].Position = SERVO_START_POS;
         }
 
@@ -197,8 +215,8 @@ namespace Itrash
         /// </summary>
         private void fullCan()
         {
-            ifKit.outputs[LED_GREEN] = false;
-            ifKit.outputs[LED_RED] = true;
+                ifKit.outputs[LED_GREEN] = false;
+                ifKit.outputs[LED_RED] = true;
         }
 
         /// <summary>
@@ -209,19 +227,25 @@ namespace Itrash
             ifKit.outputs[LED_GREEN] = true;
             ifKit.outputs[LED_RED] = false;
         }
+
         /// <summary>
         /// Light up the correct LED indicating trash type based on rotation value
         /// </summary>
         /// <param name="e">Event arguments</param>
         private void changeTrashType(SensorChangeEventArgs e)
         {
-            if (e.Value > 750)
+            updateTrashLEDs(e.Value);
+        }
+
+        private void updateTrashLEDs(int val)
+        {
+            if (val > 750)
             {
                 ifKit.outputs[LED_PAPER] = true;
                 ifKit.outputs[LED_PET] = false;
                 ifKit.outputs[LED_BURN] = true;
             }
-            else if (e.Value < 500)
+            else if (val < 500)
             {
                 ifKit.outputs[LED_PAPER] = false;
                 ifKit.outputs[LED_PET] = false;
@@ -264,7 +288,7 @@ namespace Itrash
                 changeTrashType(e);
             }
 
-            else if (currWeight < 150 && !open)
+            else if (currWeight < 150 && !open && !fullLock)
             {
                 notFullCan();
             }
