@@ -80,11 +80,6 @@ namespace Itrash
                 input = Console.ReadLine();
             }
 
-            /*for (int i = 0; i < ifKit.outputs.Count; i++)
-            {
-                ifKit.outputs[i] = false;
-            }*/
-
             Thread.Sleep(SLEEP_TIME_MS);
             closeCanOnExit();
             Thread.Sleep(SLEEP_TIME_MS);
@@ -201,11 +196,6 @@ namespace Itrash
             }
 
             // Clean up
-            /*ifKit.outputs[LED_GREEN] = true;
-            ifKit.outputs[LED_RED] = false;
-            ifKit.outputs[LED_PAPER] = true;
-            ifKit.outputs[LED_PET] = false;
-            ifKit.outputs[LED_BURN] = true;*/
             updateTrashLEDs(ifKit.sensors[SENSOR_ROTATION_ID].Value);
             servo.servos[0].Position = SERVO_START_POS;
         }
